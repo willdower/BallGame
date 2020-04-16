@@ -1,145 +1,85 @@
+//
+// Created by William on 15/04/2020.
+//
+
 #include <iostream>
 #include <fstream>
 #include <sstream>
 
-std::string cleanGetline(std::ifstream input) {
+template <class T>
+class sharedObject {
+private:
+    T **storedObject;
+public:
+    bool checkObjectExists() {
+        return (*storedObject != nullptr);
+    }
+
+    T getObject() {
+        if (this->checkObjectExists()) {
+            return **storedObject;
+        }
+        else {
+            return -1;
+        }
+    }
+
+    T operator == (const T & otherValue) {
+        if (**storedObject == otherValue) {
+            return true;
+        }
+    }
+
+    void operator = (const T toSet) {
+        **storedObject = toSet;
+    }
+
+    void destroy() {
+        delete *storedObject;
+        *storedObject = nullptr;
+    }
+
+    sharedObject() {
+        storedObject = new T*;
+        *storedObject = new T;
+    }
+    sharedObject(sharedObject<T> & existingObject) {
+        storedObject = existingObject.storedObject;
+    }
+
+    ~sharedObject() {
+        delete storedObject;
+    }
+};
+
+std::string cleanGetline(std::ifstream & input) {
     std::string returnString;
     getline(input, returnString);
-    if (*returnString.end() == '\r' || *returnString.end() == '\n') {
-        returnString.erase(returnString.end());
+    if (returnString.back() == '\r' || returnString.back() == '\n') {
+        returnString.pop_back();
     }
     return returnString;
 }
 
-unsigned long *initialiseQueue(const unsigned long n) {
-    auto *queue = new unsigned long [n]{0};
+int main() {
 
-    return queue;
-}
+    sharedObject<int> newObj;
 
-void enqueue(unsigned long value, unsigned long priority, unsigned long *queue) {
+    newObj = 4;
 
-    int position = 0;
+    std::cout << newObj.getObject() << std::endl;
 
-    while (queue[position] != 0) {
-        if (priority < queue[position]) {
-            position = position*2+1;
-        }
-        else {
-            position = position*2+2;
-        }
-    }
+    sharedObject<int> secondObj(newObj);
 
-    queue[position] = value;
+    std::cout << secondObj.getObject() << std::endl;
 
-}
+    secondObj = 3;
 
-unsigned long dequeue(unsigned long *queue, const int n) {
-    unsigned long position = 0;
+    std::cout << newObj.getObject() << std::endl;
 
-    while (position*2+2 != 0 && position*2+2 < n) {
-        position = position*2+2;
-    }
+    newObj.destroy();
 
-    unsigned long returnNum = queue[position];
-    queue[position] = 0;
-
-    return returnNum;
-}
-
-unsigned long digitSum(unsigned long value) {
-    unsigned long digitSum = 0;
-    while (value != 0) {
-        digitSum += value % 10;
-        value /= 10;
-    }
-
-    return digitSum;
-}
-
-int main(int argc, char **argv) {
-
-    if (argc != 2) {
-        std::cout << "Incorrect number of arguments" << std::endl;
-        exit(1);
-    }
-
-    std::ifstream input(argv[1]);
-    std::ofstream output("output.txt");
-
-    int testCases;
-
-    input >> testCases;
-
-    while (testCases-- > 0) {
-        int n, k;
-        input >> n;
-        input >> k;
-        std::string line;
-        line = cleanGetline(input);
-        std::stringstream ss(line);
-
-        std::string flip;
-        input >> flip;
-        bool scottsTurn; //Bool is smallest type to use for this
-        scottsTurn = (flip == "HEADS");
-
-        unsigned long *queue = initialiseQueue(n);
-        unsigned long nextNum, scottScore = 0, rustyScore = 0;
-
-        if (scottsTurn) {
-            while (!ss.eof()) {
-                ss >> nextNum;
-                enqueue(nextNum, nextNum, queue);
-            }
-        }
-        else {
-            while (!ss.eof()) {
-                ss >> nextNum;
-                enqueue(nextNum, digitSum(nextNum), queue);
-            }
-        }
-
-        while (n > 0) {
-            for (int i=k;i>0 && n>0;i--) {
-                nextNum = dequeue(queue, n);
-                if (scottsTurn) {
-                    scottScore += nextNum;
-                }
-                else {
-                    rustyScore += nextNum;
-                }
-                n--;
-            }
-            if (n == 0) {
-                break;
-            }
-            scottsTurn = !scottsTurn;
-            if (scottsTurn) {
-                unsigned long *newQueue = initialiseQueue(n);
-                nextNum = dequeue(queue, n);
-                while (nextNum != 0) {
-                    enqueue(nextNum, nextNum, newQueue);
-                }
-                delete [] queue;
-                queue = newQueue;
-                newQueue = nullptr;
-            }
-            else {
-                unsigned long *newQueue = initialiseQueue(n);
-                nextNum = dequeue(queue, n);
-                while (nextNum != 0) {
-                    enqueue(nextNum, digitSum(nextNum), newQueue);
-                }
-                delete [] queue;
-                queue = newQueue;
-                newQueue = nullptr;
-            }
-        }
-
-        output << scottScore << " " << rustyScore << std::endl;
-
-    }
+    std::cout << secondObj.getObject() << std::endl;
 
     return 0;
 }
