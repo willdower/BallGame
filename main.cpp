@@ -5,41 +5,39 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <chrono>
 
+/// Node is a struct that represents a ball, and is shared between both queues
 struct node {
     unsigned long ballValue;
-    unsigned long scottQueuePos;
-    unsigned long rustyQueuePos;
+    int scottQueuePos;
+    int rustyQueuePos;
+    int digitSum;
 };
 
+/// Priority queue keeps the node with the highest priority at its head, implemented using a maxHeap in an array
 class newPriorityQueue {
 private:
-    node **arr;
-    bool isScott;
-    unsigned long maxSize;
-    long long currentSize; //Must be signed
+    node **arr; //Is an array of pointers as the nodes are shared between queues
+    bool isScott; // Bool smaller than string indicating owner
+    int maxSize; // n
+    int currentSize;
 
-    unsigned long getPriority(const unsigned long location) {
+    unsigned long getPriority(const int location) {
         // Check if outside array or nothing is there
         // Will not segfault due to optimised if checking on OR statement
         if (location >= maxSize || arr[location] == nullptr) {
             return 0;
         }
-        unsigned long input = arr[location]->ballValue;
         if (isScott) {
-            return input;
+            return arr[location]->ballValue;
         }
         else {
-            unsigned long sum = 0;
-            while (input != 0) {
-                sum += input % 10;
-                input /= 10;
-            }
-            return sum;
+            return arr[location]->digitSum;
         }
     }
 
-    unsigned long getBallValue(const unsigned long location) {
+    unsigned long getBallValue(const int location) {
         if (location >= maxSize || arr[location] == nullptr) {
             return 0;
         }
@@ -48,7 +46,7 @@ private:
         }
     }
 
-    void swap(const unsigned long locationOne, const unsigned long locationTwo) {
+    void swap(const int locationOne, const int locationTwo) {
         node *temp = arr[locationOne];
         arr[locationOne] = arr[locationTwo];
         arr[locationTwo] = temp;
@@ -58,7 +56,7 @@ private:
 
     //Children of a[n] at a[(2*n)+1] and a[(2*n)+2]
     //Parent of a[n] at a[n/2]
-    static unsigned long parent(unsigned long input) {
+    static int parent(const int input) {
         if (input == 1) {
             return 1;
         }
@@ -67,19 +65,16 @@ private:
         }
     }
 
-    static unsigned long leftChild(unsigned long input) {
+    static int leftChild(const int input) {
         return (2*input);
     }
 
-    static unsigned long rightChild(unsigned long input) {
+    static int rightChild(const int input) {
         return (2*input)+1;
     }
 
-    bool isLeaf(const unsigned long location) {
-        return (arr[leftChild(location)] == nullptr && arr[rightChild(location)]);
-    }
-
-    void setCurrentPos(const unsigned long location) {
+    // Set the position variable of a node
+    void setCurrentPos(const int location) {
         if (arr[location] == nullptr) {
             return;
         }
@@ -91,7 +86,9 @@ private:
         }
     }
 
-    unsigned long findNextSwap(unsigned long location) {
+    /// Finds the next node to swap with when heapifying
+    int findNextSwap(const int location) {
+        // Get neighbour priorities
         auto parentPriority = getPriority(parent(location));
         auto currentPriority = getPriority(location);
         auto leftChildPriority = getPriority(leftChild(location));
@@ -101,6 +98,7 @@ private:
             return parent(location);
         }
 
+        // For Rusty, deal with conflicts where parent's digit sum is the same but ball value is not
         if (parentPriority == currentPriority && currentPriority != 0 && getBallValue(location) != getBallValue(parent(location))) {
             if (getBallValue(parent(location)) < getBallValue(location)) {
                 return parent(location);
@@ -110,6 +108,7 @@ private:
             }
         }
 
+        // If either child's priority is higher than current, find it and swap
         if (leftChildPriority > currentPriority || rightChildPriority > currentPriority) {
             if (leftChildPriority > rightChildPriority) {
                 return leftChild(location);
@@ -125,6 +124,7 @@ private:
             }
         }
 
+        // If either child has equal priority, find the child with higher value and swap
         if ((leftChildPriority == currentPriority || rightChildPriority == currentPriority) && currentPriority != 0) {
             if (leftChildPriority > rightChildPriority) {
                 if (getBallValue(leftChild(location)) > getBallValue(location)) {
@@ -158,77 +158,32 @@ private:
         return location;
     }
 
-    void maxHeapify(unsigned long location) {
+
+    /// Loops findNextSwap until node at location is in correct place
+    void maxHeapify(int location) {
         auto nextLocation = findNextSwap(location);
         while (location != nextLocation) {
             swap(location, nextLocation);
             location = nextLocation;
             nextLocation = findNextSwap(location);
         }
-
-        /*while (true) {
-            auto parentPriority = getPriority(parent(location));
-            auto currentPriority = getPriority(location);
-            auto leftChildPriority = getPriority(leftChild(location));
-            auto rightChildPriority = getPriority(rightChild(location));
-
-            if (parentPriority < currentPriority) {
-                swap(location, parent(location));
-                location = parent(location);
-                continue;
-            }
-            else if (currentPriority == parentPriority && currentPriority != 0 && getBallValue(location) != getBallValue(parent(location))) {
-                if (getBallValue(parent(location)) < getBallValue(location)) {
-                    swap(location, parent(location));
-                    location = parent(location);
-                }
-                else {
-                    break;
-                }
-            }
-            else if (leftChildPriority > currentPriority || rightChildPriority > currentPriority) {
-                if (leftChildPriority > rightChildPriority) {
-                    swap(location, leftChild(location));
-                    location = leftChild(location);
-                    continue;
-                }
-                else {
-                    swap(location, rightChild(location));
-                    location = rightChild(location);
-                    continue;
-                }
-            }
-            else {
-                break;
-            }
-        }*/
     }
 
 public:
 
+    /// Push a node into the heap and heapify
     void push(node *newNode) {
-        unsigned long location = currentSize+1;
+        int location = currentSize + 1;
         arr[location] = newNode;
         currentSize++;
-        while (getPriority(parent(location)) < getPriority(location)) {
-            swap(location, parent(location));
-            location = parent(location);
-        }
-        if (getPriority(parent(location)) == getPriority(location)) {
-            if (getBallValue(parent(location)) < getBallValue(location)) {
-                swap(location, parent(location));
-                location = parent(location);
-            }
-        }
-        if (isScott) {
-            arr[location]->scottQueuePos = location;
-        }
-        else {
-            arr[location]->rustyQueuePos = location;
-        }
+
+        maxHeapify(location);
+
+        setCurrentPos(location);
     }
 
-    unsigned long pop(unsigned long & otherPos) {
+    /// Pop the root node from the heap and heapify
+    unsigned long pop(int & otherPos) {
 
         unsigned long returnValue = arr[1]->ballValue;
         if (isScott) {
@@ -240,117 +195,31 @@ public:
         arr[1] = nullptr;
         swap(1, currentSize);
         currentSize--;
-        unsigned long location = 1;
-
-        // Finish heapifying when:
-        // a) Location has higher priority than children
-        // b) It is a leaf node
+        int location = 1;
 
         maxHeapify(location);
 
-        /*while (true) {
-            if (isLeaf(location)) {
-                break;
-            }
-
-            unsigned long currentPriority = getPriority(location);
-            unsigned long leftChildPriority = getPriority(leftChild(location));
-            unsigned long rightChildPriority = getPriority(rightChild(location));
-
-            if (currentPriority >= leftChildPriority && currentPriority >= rightChildPriority) {
-                break;
-            }
-            else if (leftChildPriority > rightChildPriority) {
-                swap(location, leftChild(location));
-                location = leftChild(location);
-            }
-            else {
-                swap(location, rightChild(location));
-                location = rightChild(location);
-            }
-        }*/
         return returnValue;
     }
 
-    void repair(unsigned long location) {
+    /// Remove node at location and heapify
+    void repair(const int location) {
         swap(location, currentSize);
         delete arr[currentSize];
         arr[currentSize] = nullptr;
         currentSize--;
 
-        // Finish repairing when:
-        // a) It's priority is greater than its children AND its priority is less than its parent
-        // b) It's priority is greater than its children AND it is root
-        // c) It's priority is less than its parent AND it is leaf
-
         maxHeapify(location);
     }
 
-        /*while (true) {
-
-            auto parentPriority = getPriority(parent(location));
-            auto currentPriority = getPriority(location);
-            auto leftChildPriority = getPriority(leftChild(location));
-            auto rightChildPriority = getPriority(rightChild(location));
-
-            // If current location is the root node
-            if (location == 0 && currentPriority >= leftChildPriority && currentPriority >= rightChildPriority) {
-                break;
-            }
-            else if (location == 0 && leftChildPriority > rightChildPriority) {
-                swap(location, leftChild(location));
-                location = leftChild(location);
-                continue;
-            }
-            else if (location == 0 && rightChildPriority > leftChildPriority) {
-                swap(location, rightChild(location));
-                location = rightChild(location);
-                continue;
-            }
-
-            // If current location is a leaf node
-            if (isLeaf(location) && currentPriority <= parentPriority) {
-                break;
-            }
-            else if (isLeaf(location) && currentPriority > parentPriority) {
-                swap(location, parent(location));
-                location = parent(location);
-                continue;
-            }
-
-            // If it is NOT root OR leaf
-            if (parentPriority < currentPriority) {
-                swap(location, parent(location));
-                location = parent(location);
-                continue;
-            }
-            else if (leftChildPriority > currentPriority || rightChildPriority > currentPriority) {
-                if (leftChildPriority > rightChildPriority) {
-                    swap(location, leftChild(location));
-                    location = leftChild(location);
-                    continue;
-                }
-                else {
-                    swap(location, rightChild(location));
-                    location = rightChild(location);
-                    continue;
-                }
-            }
-            else {
-                break;
-            }
-        }
-
-    }*/
-
     newPriorityQueue() = delete;
 
-    newPriorityQueue(const bool isScottsQueue, const long n) {
+    newPriorityQueue(const bool isScottsQueue, const int n) {
         maxSize = n+1;
         currentSize = 0;
         isScott = isScottsQueue;
         arr = new node* [n+1];
-        for (int i=0;i<n;i++) {
+        for (int i=0;i<n+1;i++) {
             arr[i] = nullptr;
         }
 
@@ -360,6 +229,7 @@ public:
     }
 };
 
+/// Strips line modifiers such as \r or \n for clean input
 std::string cleanGetline(std::ifstream & input) {
     std::string returnString;
     getline(input, returnString);
@@ -367,6 +237,15 @@ std::string cleanGetline(std::ifstream & input) {
         returnString.pop_back();
     }
     return returnString;
+}
+
+int getDigitSum(unsigned long n) {
+    int sum = 0;
+    while (n != 0) {
+        sum += static_cast<int>(n % 10); // Narrowing conversion always safe as result of n % 10 can never be > 9
+        n /= 10;
+    }
+    return sum;
 }
 
 int main(int argc, char **argv) {
@@ -388,46 +267,56 @@ int main(int argc, char **argv) {
         std::stringstream getBallsLine(cleanGetline(input));
         std::string flipResult = cleanGetline(input);
 
+        auto startExecution = std::chrono::system_clock::now();
+
         int n, k;
         getDetailsLine >> n >> k;
 
         newPriorityQueue scottQueue(true, n);
         newPriorityQueue rustyQueue(false, n);
 
+        // Push all nodes into the queues
         for (int i=0;i<n;i++) {
             auto *nextNode = new node;
             getBallsLine >> nextNode->ballValue;
+            nextNode->digitSum = getDigitSum(nextNode->ballValue);
 
             scottQueue.push(nextNode);
             rustyQueue.push(nextNode);
         }
 
-        unsigned long ballsLeft = n;
+        // Loop through all of the turns
+        int ballsLeft = n;
         bool scottsTurn = (flipResult == "HEADS");
         unsigned long long scottScore = 0, rustyScore = 0;
-        unsigned long otherPos;
+        int otherPos;
         while (ballsLeft > 0) {
             if (scottsTurn) {
                 unsigned long leftThisTurn = k;
                 while (leftThisTurn > 0 && ballsLeft > 0) {
-                    scottScore += scottQueue.pop(otherPos);
-                    rustyQueue.repair(otherPos);
+                    scottScore += scottQueue.pop(otherPos); // otherPos will be set to the position of the popped node in the opposite queue
+                    rustyQueue.repair(otherPos); // Remove the previously popped node from this queue as it's no longer choosable
                     ballsLeft--;
                     leftThisTurn--;
                 }
-                scottsTurn = !scottsTurn;
+                scottsTurn = !scottsTurn; // Change whose turn it is
             }
             else {
                 unsigned long leftThisTurn = k;
                 while (leftThisTurn > 0 && ballsLeft > 0) {
-                    rustyScore += rustyQueue.pop(otherPos);
-                    scottQueue.repair(otherPos);
+                    rustyScore += rustyQueue.pop(otherPos); // otherPos will be set to the position of the popped node in the opposite queue
+                    scottQueue.repair(otherPos); // Remove the previously popped node from this queue as it's no longer choosable
                     ballsLeft--;
                     leftThisTurn--;
                 }
-                scottsTurn = !scottsTurn;
+                scottsTurn = !scottsTurn; // Change whose turn it is
             }
         }
+
+        auto endExecution = std::chrono::system_clock::now();
+        std::chrono::duration<double> timeTaken = endExecution - startExecution;
+        std::cout << "Input " << testCase << " Time: " << timeTaken.count() << " seconds." << std::endl;
+
         output << scottScore << " " << rustyScore << std::endl;
     }
 
